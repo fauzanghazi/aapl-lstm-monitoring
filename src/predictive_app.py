@@ -162,7 +162,6 @@ if st.button("Run Prediction", key="run_prediction_btn"):
     st.session_state.run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
     # model code ...
-
     # ----- Model v1 -----
     start = time.time()
     X1 = prepare_input_v1(df, selected_date, model_v1)

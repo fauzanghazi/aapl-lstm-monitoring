@@ -15,19 +15,15 @@ venv/
 Thumbs.db
 
 # Logs and runtime files
-logs/monitoring_logs.csv
-
-# Model artifacts
-models/*.pkl
+logs/
 
 # Streamlit cache
 .streamlit/
 
-# TensorFlow
+# TensorFlow / ML artifacts (optional)
 *.h5
 *.ckpt
 *.pb
-logs/
 
 # IDE
 .vscode/
