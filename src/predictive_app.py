@@ -139,30 +139,35 @@ def rolling_next_day_forecast(df, end_date, model_dict, version, lookback=60):
 
 
 # =========================================================
-# User input (FIXED)
+# User input
 # =========================================================
 st.subheader("Input Parameters")
 
-valid_dates = df["Date"].dt.date.tolist()
-
-selected_date = st.selectbox(
-    "Select last available date",
-    options=valid_dates,
-    index=len(valid_dates) - 1,
-)
+selected_date = st.date_input("Select last available date", value=df["Date"].max())
 
 if st.session_state.last_date != selected_date:
     st.session_state.prediction_done = False
 
+valid_dates = df["Date"].dt.date.values
+
+if selected_date not in valid_dates:
+    adjusted_date = df[df["Date"].dt.date < selected_date]["Date"].dt.date.max()
+    st.warning(
+        f"Selected date is not a trading day. "
+        f"Adjusted to nearest available date: {adjusted_date}"
+    )
+    selected_date = adjusted_date
+
 
 # =========================================================
-# Run prediction
+# Run prediction (SINGLE BUTTON, FIXED)
 # =========================================================
 if st.button("Run Prediction", key="run_prediction_btn"):
     st.session_state.prediction_done = True
     st.session_state.last_date = selected_date
     st.session_state.run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
+    # model code ...
     # ----- Model v1 -----
     start = time.time()
     X1 = prepare_input_v1(df, selected_date, model_v1)
@@ -279,19 +284,11 @@ if st.session_state.prediction_done and metrics:
 # Feedback logging
 # =========================================================
 if st.session_state.prediction_done:
-    give_feedback = st.checkbox(
-        "Give feedback on this prediction", key="feedback_checkbox"
-    )
+    give_feedback = st.checkbox("Give feedback on this prediction")
 
     if give_feedback:
         with st.form("feedback_form", clear_on_submit=True):
-            score = st.slider(
-                "Prediction usefulness",
-                1,
-                5,
-                3,
-                key="feedback_score",
-            )
+            score = st.slider("Prediction usefulness", 1, 5, 3)
             comment = st.text_area("Comments")
             submitted = st.form_submit_button("Submit Feedback")
 
