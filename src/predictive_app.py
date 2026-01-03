@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import time
+import json
 
 from log_utils import log_prediction
 
@@ -15,7 +16,7 @@ st.title("AAPL Next-Day Price Prediction")
 st.write("Compare baseline LSTM (v1) and improved LSTM (v2)")
 
 # -----------------------------
-# Session state initialisation
+# Session state
 # -----------------------------
 if "prediction_done" not in st.session_state:
     st.session_state.prediction_done = False
@@ -48,6 +49,18 @@ def load_model(path):
 model_v1 = load_model("models/model_v1.pkl")
 model_v2 = load_model("models/model_v2.pkl")
 
+
+# -----------------------------
+# Load metrics
+# -----------------------------
+@st.cache_data
+def load_metrics():
+    with open("metrics/model_metrics_2025.json", "r") as f:
+        return json.load(f)
+
+
+metrics = load_metrics()
+
 # -----------------------------
 # User input
 # -----------------------------
@@ -65,7 +78,7 @@ if selected_date not in df["Date"].dt.date.values:
 
 
 # -----------------------------
-# Prepare input for v1
+# Input preparation
 # -----------------------------
 def prepare_input_v1(df, date, model_dict):
     window = model_dict["window_size"]
@@ -76,9 +89,6 @@ def prepare_input_v1(df, date, model_dict):
     return scaled.reshape(1, window, 1)
 
 
-# -----------------------------
-# Prepare input for v2
-# -----------------------------
 def prepare_input_v2(df, date, model_dict):
     window = model_dict["window_size"]
     scaler = model_dict["scaler"]
@@ -122,7 +132,7 @@ if st.button("Run Prediction"):
     )[0][0]
 
 # -----------------------------
-# Display results, chart, feedback
+# Display results
 # -----------------------------
 if st.session_state.prediction_done:
     st.subheader("Prediction Results")
@@ -134,7 +144,7 @@ if st.session_state.prediction_done:
     st.write(f"v2 latency: {st.session_state.latency_v2:.2f} ms")
 
     # -----------------------------
-    # Price trend visualization
+    # Price trend
     # -----------------------------
     st.subheader("Recent Price Trend")
 
@@ -150,7 +160,21 @@ if st.session_state.prediction_done:
     )
 
     # -----------------------------
-    # Feedback
+    # Accuracy metrics
+    # -----------------------------
+    st.subheader("Model Accuracy Comparison (2025 Holdout)")
+
+    metrics_df = pd.DataFrame({"Model v1": metrics["v1"], "Model v2": metrics["v2"]})
+
+    st.table(metrics_df)
+
+    st.caption(
+        "Accuracy metrics are computed using rolling next-day predictions "
+        "on the 2025 holdout period. Lower values indicate better performance."
+    )
+
+    # -----------------------------
+    # User feedback
     # -----------------------------
     st.subheader("User Feedback")
 
