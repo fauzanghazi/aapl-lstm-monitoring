@@ -1,3 +1,8 @@
+# =========================================================
+# Imports
+# =========================================================
+import uuid
+from datetime import datetime
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,27 +14,35 @@ import os
 
 from log_utils import log_prediction
 
-# -----------------------------
-# Page setup
-# -----------------------------
+
+# =========================================================
+# Page configuration
+# =========================================================
 st.set_page_config(page_title="AAPL Price Prediction", layout="centered")
 
 st.title("AAPL Next-Day Price Prediction")
-st.write("Compare baseline LSTM (v1) and improved LSTM (v2)")
+st.write("Comparison between baseline LSTM (v1) and improved LSTM (v2)")
 
-# -----------------------------
-# Session state
-# -----------------------------
+
+# =========================================================
+# Session state initialization
+# =========================================================
 if "prediction_done" not in st.session_state:
     st.session_state.prediction_done = False
 
 if "last_date" not in st.session_state:
     st.session_state.last_date = None
 
+if "session_hash" not in st.session_state:
+    st.session_state.session_hash = uuid.uuid4().hex[:8]
 
-# -----------------------------
-# Load data
-# -----------------------------
+if "run_id" not in st.session_state:
+    st.session_state.run_id = None
+
+
+# =========================================================
+# Data loading
+# =========================================================
 @st.cache_data
 def load_data():
     df = pd.read_csv("data/raw/aapl_2000_2025.csv", parse_dates=["Date"])
@@ -39,9 +52,9 @@ def load_data():
 df = load_data()
 
 
-# -----------------------------
-# Load models
-# -----------------------------
+# =========================================================
+# Model loading
+# =========================================================
 @st.cache_resource
 def load_model(path):
     with open(path, "rb") as f:
@@ -52,9 +65,9 @@ model_v1 = load_model("models/model_v1.pkl")
 model_v2 = load_model("models/model_v2.pkl")
 
 
-# -----------------------------
-# Load metrics
-# -----------------------------
+# =========================================================
+# Metrics loading
+# =========================================================
 @st.cache_data
 def load_metrics():
     path = "metrics/model_metrics_2025.json"
@@ -66,31 +79,17 @@ def load_metrics():
 
 metrics = load_metrics()
 
-# -----------------------------
-# User input
-# -----------------------------
-st.subheader("Input Parameters")
 
-selected_date = st.date_input("Select last available date", value=df["Date"].max())
-
-# Reset prediction if date changes
-if st.session_state.last_date != selected_date:
-    st.session_state.prediction_done = False
-
-if selected_date not in df["Date"].dt.date.values:
-    st.error("Selected date not found in dataset")
-    st.stop()
-
-
-# -----------------------------
-# Input preparation
-# -----------------------------
+# =========================================================
+# Feature preparation
+# =========================================================
 def prepare_input_v1(df, date, model_dict):
     window = model_dict["window_size"]
     scaler = model_dict["scaler"]
 
     data = df[df["Date"] <= pd.to_datetime(date)]["Close"].values[-window:]
     scaled = scaler.transform(data.reshape(-1, 1))
+
     return scaled.reshape(1, window, 1)
 
 
@@ -110,8 +109,11 @@ def prepare_input_v2(df, date, model_dict):
     return scaled.reshape(1, window, scaled.shape[1])
 
 
+# =========================================================
+# Rolling next-day forecast
+# =========================================================
 def rolling_next_day_forecast(df, end_date, model_dict, version, lookback=60):
-    preds = []
+    forecasts = []
     dates = []
 
     sub_df = df[df["Date"] <= pd.to_datetime(end_date)].tail(lookback + 1)
@@ -121,47 +123,66 @@ def rolling_next_day_forecast(df, end_date, model_dict, version, lookback=60):
 
         if version == "v1":
             X = prepare_input_v1(df, current_date, model_dict)
-            p_scaled = model_dict["model"].predict(X, verbose=0)
-            p = model_dict["scaler"].inverse_transform(p_scaled)[0][0]
+            pred_scaled = model_dict["model"].predict(X, verbose=0)
+            pred = model_dict["scaler"].inverse_transform(pred_scaled)[0][0]
         else:
             X = prepare_input_v2(df, current_date, model_dict)
-            p_scaled = model_dict["model"].predict(X, verbose=0)
-            p = model_dict["scaler"].inverse_transform(
-                np.hstack([p_scaled, np.zeros((1, 2))])
+            pred_scaled = model_dict["model"].predict(X, verbose=0)
+            pred = model_dict["scaler"].inverse_transform(
+                np.hstack([pred_scaled, np.zeros((1, 2))])
             )[0][0]
 
-        preds.append(p)
+        forecasts.append(pred)
         dates.append(sub_df.iloc[i + 1]["Date"])
 
-    return pd.DataFrame({"Date": dates, "Forecast": preds})
+    return pd.DataFrame({"Date": dates, "Forecast": forecasts})
 
 
-# -----------------------------
-# Run prediction
-# -----------------------------
-if st.button("Run Prediction"):
+# =========================================================
+# User input
+# =========================================================
+st.subheader("Input Parameters")
+
+selected_date = st.date_input("Select last available date", value=df["Date"].max())
+
+if st.session_state.last_date != selected_date:
+    st.session_state.prediction_done = False
+
+if selected_date not in df["Date"].dt.date.values:
+    st.error("Selected date not found in dataset")
+    st.stop()
+
+
+# =========================================================
+# Run prediction (SINGLE BUTTON, FIXED)
+# =========================================================
+if st.button("Run Prediction", key="run_prediction_btn"):
     st.session_state.prediction_done = True
     st.session_state.last_date = selected_date
+    st.session_state.run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
-    # Model v1
-    start_v1 = time.time()
+    # model code ...
+
+    # ----- Model v1 -----
+    start = time.time()
     X1 = prepare_input_v1(df, selected_date, model_v1)
     p1_scaled = model_v1["model"].predict(X1, verbose=0)
-    st.session_state.latency_v1 = (time.time() - start_v1) * 1000
+    st.session_state.latency_v1 = (time.time() - start) * 1000
     st.session_state.pred_v1 = model_v1["scaler"].inverse_transform(p1_scaled)[0][0]
 
-    # Model v2
-    start_v2 = time.time()
+    # ----- Model v2 -----
+    start = time.time()
     X2 = prepare_input_v2(df, selected_date, model_v2)
     p2_scaled = model_v2["model"].predict(X2, verbose=0)
-    st.session_state.latency_v2 = (time.time() - start_v2) * 1000
+    st.session_state.latency_v2 = (time.time() - start) * 1000
     st.session_state.pred_v2 = model_v2["scaler"].inverse_transform(
         np.hstack([p2_scaled, np.zeros((1, 2))])
     )[0][0]
 
-# -----------------------------
-# Display results
-# -----------------------------
+
+# =========================================================
+# Prediction results
+# =========================================================
 if st.session_state.prediction_done:
     st.subheader("Prediction Results")
 
@@ -181,100 +202,101 @@ if st.session_state.prediction_done:
             help=f"Latency: {st.session_state.latency_v2:.2f} ms",
         )
 
-    # -----------------------------
-    # Weekly Actual vs Forecast chart
-    # -----------------------------
+
+# =========================================================
+# Rolling forecast visualization
+# =========================================================
+if st.session_state.prediction_done:
     st.subheader("Actual vs Forecast (Weekly, Rolling Next-Day)")
 
-    lookback_days = 90
-    history = df[df["Date"] <= pd.to_datetime(selected_date)].tail(lookback_days)
+    lookback_days = 60
 
-    v1_df = rolling_next_day_forecast(df, selected_date, model_v1, "v1", lookback_days)
-    v2_df = rolling_next_day_forecast(df, selected_date, model_v2, "v2", lookback_days)
+    history = (
+        df[df["Date"] <= pd.to_datetime(selected_date)]
+        .tail(lookback_days + 1)
+        .set_index("Date")
+        .resample("W")
+        .last()
+    )
 
-    actual_weekly = history.set_index("Date")["Close"].resample("W").mean()
-    v1_weekly = v1_df.set_index("Date")["Forecast"].resample("W").mean()
-    v2_weekly = v2_df.set_index("Date")["Forecast"].resample("W").mean()
+    df_v1 = (
+        rolling_next_day_forecast(df, selected_date, model_v1, "v1", lookback_days)
+        .set_index("Date")
+        .resample("W")
+        .last()
+        .rename(columns={"Forecast": "Model v1 Forecast"})
+    )
+
+    df_v2 = (
+        rolling_next_day_forecast(df, selected_date, model_v2, "v2", lookback_days)
+        .set_index("Date")
+        .resample("W")
+        .last()
+        .rename(columns={"Forecast": "Model v2 Forecast"})
+    )
 
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Scatter(
-            x=actual_weekly.index,
-            y=actual_weekly.values,
-            mode="lines",
-            name="Actual",
-            line=dict(color="#E0E0E0", width=2),
-        )
-    )
+    fig.add_trace(go.Scatter(x=history.index, y=history["Close"], name="Actual"))
 
     fig.add_trace(
         go.Scatter(
-            x=v1_weekly.index,
-            y=v1_weekly.values,
-            mode="lines",
+            x=df_v1.index,
+            y=df_v1["Model v1 Forecast"],
             name="Model v1 Forecast",
-            line=dict(color="#FFA500", dash="dot"),
+            line=dict(dash="dot"),
         )
     )
 
     fig.add_trace(
         go.Scatter(
-            x=v2_weekly.index,
-            y=v2_weekly.values,
-            mode="lines",
+            x=df_v2.index,
+            y=df_v2["Model v2 Forecast"],
             name="Model v2 Forecast",
-            line=dict(color="#00E5FF", dash="dash"),
+            line=dict(dash="dash"),
         )
     )
 
     fig.update_layout(
         template="plotly_dark",
+        height=450,
         xaxis_title="Week",
         yaxis_title="Price",
-        legend_title="Series",
-        height=450,
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    st.caption(
-        "Model v1 reacts faster to price changes but is more volatile. "
-        "Model v2 produces smoother forecasts but lags during trend shifts."
-    )
 
-    # -----------------------------
-    # Metrics (collapsed)
-    # -----------------------------
-    if metrics:
-        with st.expander("Model Accuracy Metrics (2025 Holdout)", expanded=False):
-            st.table(pd.DataFrame(metrics).T)
+# =========================================================
+# Model metrics
+# =========================================================
+if st.session_state.prediction_done and metrics:
+    with st.expander("Model Accuracy Metrics (2025 Holdout)"):
+        st.dataframe(pd.DataFrame(metrics).T[["mae", "rmse"]], use_container_width=True)
 
-    # -----------------------------
-    # User feedback (collapsed)
-    # -----------------------------
-    with st.expander("User Feedback", expanded=False):
-        feedback_score = st.slider(
-            "Prediction usefulness (1 = poor, 5 = excellent)", 1, 5, 3
-        )
 
-        feedback_comment = st.text_area("Comments")
+# =========================================================
+# Feedback logging
+# =========================================================
+if st.session_state.prediction_done:
+    give_feedback = st.checkbox("Give feedback on this prediction")
 
-        if st.button("Submit Feedback"):
+    if give_feedback:
+        with st.form("feedback_form", clear_on_submit=True):
+            score = st.slider("Prediction usefulness", 1, 5, 3)
+            comment = st.text_area("Comments")
+            submitted = st.form_submit_button("Submit Feedback")
+
+        if submitted:
             log_prediction(
-                model_version="v1",
-                prediction=st.session_state.pred_v1,
-                latency_ms=st.session_state.latency_v1,
-                feedback_score=feedback_score,
-                feedback_comment=feedback_comment,
+                run_id=st.session_state.run_id,
+                session_hash=st.session_state.session_hash,
+                model_version="comparison",
+                prediction_v1=float(st.session_state.pred_v1),
+                prediction_v2=float(st.session_state.pred_v2),
+                latency_v1_ms=float(st.session_state.latency_v1),
+                latency_v2_ms=float(st.session_state.latency_v2),
+                feedback_score=int(score),
+                feedback_comment=comment,
             )
-
-            log_prediction(
-                model_version="v2",
-                prediction=st.session_state.pred_v2,
-                latency_ms=st.session_state.latency_v2,
-                feedback_score=feedback_score,
-                feedback_comment=feedback_comment,
-            )
-
-            st.success("Feedback logged successfully")
+            st.success("Feedback submitted successfully")
