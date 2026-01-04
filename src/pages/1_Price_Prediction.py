@@ -110,6 +110,35 @@ def prepare_input_v2(df, date, model_dict):
 
 
 # =========================================================
+# Rolling next-day forecast (RESTORED)
+# =========================================================
+def rolling_next_day_forecast(df, end_date, model_dict, version, lookback=60):
+    forecasts = []
+    dates = []
+
+    sub_df = df[df["Date"] <= pd.to_datetime(end_date)].tail(lookback + 1)
+
+    for i in range(len(sub_df) - 1):
+        current_date = sub_df.iloc[i]["Date"]
+
+        if version == "v1":
+            X = prepare_input_v1(df, current_date, model_dict)
+            pred_scaled = model_dict["model"].predict(X, verbose=0)
+            pred = model_dict["scaler"].inverse_transform(pred_scaled)[0][0]
+        else:
+            X = prepare_input_v2(df, current_date, model_dict)
+            pred_scaled = model_dict["model"].predict(X, verbose=0)
+            pred = model_dict["scaler"].inverse_transform(
+                np.hstack([pred_scaled, np.zeros((1, 2))])
+            )[0][0]
+
+        forecasts.append(pred)
+        dates.append(sub_df.iloc[i + 1]["Date"])
+
+    return pd.DataFrame({"Date": dates, "Forecast": forecasts})
+
+
+# =========================================================
 # User input
 # =========================================================
 st.subheader("Input Parameters")
@@ -174,6 +203,67 @@ if st.session_state.prediction_done:
         )
 
 # =========================================================
+# Actual vs Forecast Line Chart (RESTORED)
+# =========================================================
+if st.session_state.prediction_done:
+    st.subheader("Actual vs Forecast (Weekly, Rolling Next-Day)")
+
+    lookback_days = 60
+
+    history = (
+        df[df["Date"] <= pd.to_datetime(selected_date)]
+        .tail(lookback_days + 1)
+        .set_index("Date")
+        .resample("W")
+        .last()
+    )
+
+    df_v1 = (
+        rolling_next_day_forecast(df, selected_date, model_v1, "v1", lookback_days)
+        .set_index("Date")
+        .resample("W")
+        .last()
+        .rename(columns={"Forecast": "Model v1 Forecast"})
+    )
+
+    df_v2 = (
+        rolling_next_day_forecast(df, selected_date, model_v2, "v2", lookback_days)
+        .set_index("Date")
+        .resample("W")
+        .last()
+        .rename(columns={"Forecast": "Model v2 Forecast"})
+    )
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=history.index, y=history["Close"], name="Actual"))
+    fig.add_trace(
+        go.Scatter(
+            x=df_v1.index,
+            y=df_v1["Model v1 Forecast"],
+            name="Model v1 Forecast",
+            line=dict(dash="dot"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df_v2.index,
+            y=df_v2["Model v2 Forecast"],
+            name="Model v2 Forecast",
+            line=dict(dash="dash"),
+        )
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=450,
+        xaxis_title="Week",
+        yaxis_title="Price",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# =========================================================
 # Feedback logging (CSV + LIVE MEMORY)
 # =========================================================
 if st.session_state.prediction_done:
@@ -186,7 +276,6 @@ if st.session_state.prediction_done:
             submitted = st.form_submit_button("Submit Feedback")
 
         if submitted:
-            # Persist to CSV (evidence)
             log_prediction(
                 run_id=st.session_state.run_id,
                 session_hash=st.session_state.session_hash,
@@ -199,7 +288,6 @@ if st.session_state.prediction_done:
                 feedback_comment=comment,
             )
 
-            # 🔥 LIVE MONITORING
             st.session_state.monitoring_logs.append(
                 {
                     "timestamp": pd.Timestamp.utcnow(),

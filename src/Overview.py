@@ -1,14 +1,10 @@
-if "monitoring_logs" not in st.session_state:
-    st.session_state.monitoring_logs = []
-
-
 import streamlit as st
 
 # =========================================================
 # Page configuration
 # =========================================================
 st.set_page_config(
-    page_title="AAPL LSTM System",
+    page_title="AAPL LSTM System Overview",
     layout="wide",
 )
 
@@ -29,31 +25,35 @@ with col1:
 with col2:
     st.title("AAPL LSTM Prediction & Monitoring System")
     st.caption(
-        "End-to-end data science application with iterative model development, deployment, and monitoring"
+        "End-to-end data science application using Agile and iterative development principles"
     )
-
 
 st.markdown("---")
 
 # =========================================================
-# Overview
+# System Overview
 # =========================================================
 st.subheader("System Overview")
 
 st.write(
     """
-    This application demonstrates a **complete data science lifecycle** implemented using
-    **Agile and iterative development principles**.
+    This application demonstrates a **complete end-to-end data science lifecycle**
+    built and deployed using **Agile-based iterative development**.
 
-    The system includes:
-    - A baseline LSTM model (Model v1)
-    - An improved LSTM model (Model v2)
-    - A Streamlit prediction interface with latency measurement
-    - User feedback collection
-    - Centralized logging
-    - A monitoring dashboard for operational insights
+    The system showcases how predictive models evolve across iterations and how
+    operational monitoring supports continuous improvement.
+    """
+)
 
-    Use the **sidebar navigation** to explore each component of the system.
+st.markdown(
+    """
+    **Core Components:**
+    - Baseline LSTM model (Model v1)
+    - Improved LSTM model (Model v2)
+    - Interactive Streamlit prediction interface
+    - Latency measurement for model inference
+    - User feedback collection and logging
+    - Monitoring dashboard for deployed model behaviour
     """
 )
 
@@ -68,9 +68,9 @@ with col1:
     st.markdown("### 🔮 Prediction")
     st.write(
         """
-        - Next-day AAPL price prediction  
+        - Next-day AAPL stock price prediction  
         - Side-by-side comparison of Model v1 and Model v2  
-        - Latency measurement for each inference
+        - Real-time inference latency measurement
         """
     )
 
@@ -78,9 +78,9 @@ with col2:
     st.markdown("### 📝 Feedback & Logging")
     st.write(
         """
-        - User usefulness rating  
-        - Free-text feedback  
-        - Persistent logging of predictions, latency, and comments
+        - User usefulness rating (1–5 scale)  
+        - Free-text qualitative feedback  
+        - Persistent CSV-based logging for audit and evidence
         """
     )
 
@@ -88,66 +88,49 @@ with col3:
     st.markdown("### 📊 Monitoring")
     st.write(
         """
-        - Latency comparison between models  
+        - Latency comparison across model versions  
         - Feedback score analysis  
         - Recent user comments  
-        - Raw operational logs
+        - Full operational log inspection
         """
     )
 
 st.markdown("---")
 
 # =========================================================
-# Live Market Context (TradingView)
+# Live Market Context
 # =========================================================
-st.subheader("Live Market Context")
+st.subheader("Live Market Context (AAPL)")
 
 st.write(
     """
-    The chart below provides real-world market context for the prediction task,
-    allowing users to interpret model outputs relative to recent AAPL price movements.
+    The live market chart below provides real-world context for interpreting
+    model predictions relative to recent AAPL price movements.
     """
 )
 
 tradingview_html = """
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-  {
-    "symbols": [
-      ["Apple", "NASDAQ:AAPL|1D"]
-    ],
-    "chartOnly": false,
-    "width": "100%",
-    "height": 500,
-    "locale": "en",
-    "colorTheme": "dark",
-    "autosize": false,
-    "showVolume": true,
-    "showMA": false,
-    "hideDateRanges": false,
-    "hideMarketStatus": false,
-    "hideSymbolLogo": false,
-    "scalePosition": "right",
-    "scaleMode": "Normal",
-    "fontFamily": "Trebuchet MS, sans-serif",
-    "fontSize": "10",
-    "noTimeScale": false,
-    "valuesTracking": "1",
-    "changeMode": "price-and-percent",
-    "chartType": "candlesticks"
-  }
-  </script>
-</div>
+<iframe
+    src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ:AAPL
+    &interval=D
+    &theme=dark
+    &style=1
+    &locale=en
+    &hide_side_toolbar=true
+    &allow_symbol_change=false"
+    style="width:100%; height:520px;"
+    frameborder="0"
+    allowtransparency="true"
+    scrolling="no">
+</iframe>
 """
 
-st.components.v1.html(tradingview_html, height=520)
-
+st.components.v1.html(tradingview_html, height=540)
 
 # =========================================================
-# Footer note
+# Footer
 # =========================================================
 st.markdown("---")
 st.caption(
-    "Academic project demonstrating Agile-based data science system construction using Streamlit and LSTM models."
+    "Academic project for MRTB2173 Agile Data Science demonstrating iterative model development, deployment, and monitoring."
 )
