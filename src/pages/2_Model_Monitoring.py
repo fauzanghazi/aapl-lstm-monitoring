@@ -3,6 +3,7 @@
 # =========================================================
 import streamlit as st
 import pandas as pd
+import time
 
 # =========================================================
 # Page configuration
@@ -17,12 +18,21 @@ st.write("Operational monitoring for deployed LSTM models")
 
 LOG_FILE = "logs/monitoring_logs.csv"
 
+# =========================================================
+# Refresh control (IMPORTANT)
+# =========================================================
+if "refresh_token" not in st.session_state:
+    st.session_state.refresh_token = 0
+
+if st.button("🔄 Refresh Logs"):
+    st.session_state.refresh_token = time.time()
+
 
 # =========================================================
-# Load logs
+# Load logs (cache-aware)
 # =========================================================
 @st.cache_data
-def load_logs():
+def load_logs(_refresh_token):
     try:
         df = pd.read_csv(LOG_FILE, parse_dates=["timestamp"])
         return df
@@ -30,7 +40,7 @@ def load_logs():
         return pd.DataFrame()
 
 
-logs = load_logs()
+logs = load_logs(st.session_state.refresh_token)
 
 if logs.empty:
     st.warning("No monitoring logs found. Run predictions and submit feedback first.")
@@ -114,7 +124,6 @@ else:
 # Raw Monitoring Logs
 # =========================================================
 st.subheader("Raw Monitoring Logs")
-
 st.dataframe(logs, use_container_width=True)
 
 # =========================================================
@@ -125,11 +134,13 @@ st.subheader("Interpretation")
 st.markdown(
     """
     **Model Behaviour Insights:**
+
     - The dashboard compares prediction latency between the baseline and improved LSTM models.
-    - Average latency values indicate computational efficiency differences.
+    - Average latency values highlight computational efficiency differences across iterations.
     - User feedback scores provide qualitative assessment of prediction usefulness.
-    - Logged comments highlight potential usability issues and improvement areas.
-    
-    This monitoring view supports iterative model refinement and operational decision-making.
+    - Logged comments reveal usability concerns and guide future improvements.
+
+    This monitoring view supports **Agile-based iterative refinement**, enabling informed
+    decisions on model performance, system responsiveness, and user experience.
     """
 )
