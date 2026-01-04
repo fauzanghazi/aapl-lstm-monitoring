@@ -1,3 +1,7 @@
+if "monitoring_logs" not in st.session_state:
+    st.session_state.monitoring_logs = []
+
+
 import streamlit as st
 
 # =========================================================

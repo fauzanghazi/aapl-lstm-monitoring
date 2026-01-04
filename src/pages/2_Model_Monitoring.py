@@ -3,7 +3,6 @@
 # =========================================================
 import streamlit as st
 import pandas as pd
-import time
 
 # =========================================================
 # Page configuration
@@ -16,34 +15,27 @@ st.set_page_config(
 st.title("AAPL Model Monitoring Dashboard")
 st.write("Operational monitoring for deployed LSTM models")
 
-LOG_FILE = "logs/monitoring_logs.csv"
-
 # =========================================================
-# Refresh control (IMPORTANT)
+# Load monitoring data (LIVE FIRST, CSV FALLBACK)
 # =========================================================
-if "refresh_token" not in st.session_state:
-    st.session_state.refresh_token = 0
 
-if st.button("🔄 Refresh Logs"):
-    st.session_state.refresh_token = time.time()
-
-
-# =========================================================
-# Load logs (cache-aware)
-# =========================================================
-@st.cache_data
-def load_logs(_refresh_token):
+# 1️⃣ LIVE in-memory logs (from Prediction page)
+if "monitoring_logs" in st.session_state and st.session_state.monitoring_logs:
+    logs = pd.DataFrame(st.session_state.monitoring_logs)
+    st.caption("Showing **live session monitoring data**")
+else:
+    # 2️⃣ Fallback to CSV (for evidence / screenshots)
+    LOG_FILE = "logs/monitoring_logs.csv"
     try:
-        df = pd.read_csv(LOG_FILE, parse_dates=["timestamp"])
-        return df
+        logs = pd.read_csv(LOG_FILE, parse_dates=["timestamp"])
+        st.caption("Showing **persisted monitoring logs (CSV)**")
     except FileNotFoundError:
-        return pd.DataFrame()
-
-
-logs = load_logs(st.session_state.refresh_token)
+        logs = pd.DataFrame()
 
 if logs.empty:
-    st.warning("No monitoring logs found. Run predictions and submit feedback first.")
+    st.warning(
+        "No monitoring data available. Run predictions and submit feedback first."
+    )
     st.stop()
 
 # =========================================================
@@ -138,9 +130,9 @@ st.markdown(
     - The dashboard compares prediction latency between the baseline and improved LSTM models.
     - Average latency values highlight computational efficiency differences across iterations.
     - User feedback scores provide qualitative assessment of prediction usefulness.
-    - Logged comments reveal usability concerns and guide future improvements.
+    - Logged comments reveal usability issues and guide future improvements.
 
-    This monitoring view supports **Agile-based iterative refinement**, enabling informed
-    decisions on model performance, system responsiveness, and user experience.
+    This monitoring view supports **Agile-based iterative refinement**, enabling rapid feedback
+    loops and evidence-driven model improvement decisions.
     """
 )
